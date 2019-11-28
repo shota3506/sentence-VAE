@@ -1,0 +1,6 @@
+__pycache__
+save
+data
+simple-examples
+*.sh
+!downloaddata.sh
