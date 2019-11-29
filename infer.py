@@ -4,7 +4,8 @@ import torch
 import argparse
 import numpy as np
 
-from models.vae import VAE
+from models.rnn_vae import RNNVAE
+from models.transformer_vae import TransformerVAE
 from utils import decode_sentnece_from_token
 
 
@@ -14,21 +15,39 @@ def main(args):
 
     w2i, i2w = vocab['w2i'], vocab['i2w']
 
-    model = VAE(
-        vocab_size=len(w2i),
-        sos_idx=w2i['<sos>'],
-        eos_idx=w2i['<eos>'],
-        pad_idx=w2i['<pad>'],
-        unk_idx=w2i['<unk>'],
-        max_sequence_length=args.max_sequence_length,
-        embedding_size=args.embedding_size,
-        rnn_type=args.rnn_type,
-        hidden_size=args.hidden_size,
-        word_dropout=args.word_dropout,
-        dropout=args.embedding_dropout,
-        latent_size=args.latent_size,
-        num_layers=args.num_layers,
-        bidirectional=args.bidirectional)
+    if args.model == 'rnn':
+        model = RNNVAE(
+            rnn_type=args.rnn_type,
+            num_embeddings=len(w2i),
+            dim_embedding=args.dim_embedding,
+            dim_hidden=args.dim_hidden, 
+            num_layers=args.num_layers,
+            bidirectional=args.bidirectional, 
+            dim_latent=args.dim_latent, 
+            word_dropout=args.word_dropout,
+            dropout=args.dropout,
+            sos_idx=w2i['<sos>'],
+            eos_idx=w2i['<eos>'],
+            pad_idx=w2i['<pad>'],
+            unk_idx=w2i['<unk>'],
+            max_sequence_length=args.max_sequence_length).to(device)
+    elif args.model == 'transformer':
+        model = TransformerVAE(
+            num_embeddings=len(w2i),
+            dim_model=args.dim_model,
+            nhead=args.nhead,
+            dim_feedforward=args.dim_feedforward,
+            num_layers=args.num_layers,
+            dim_latent=args.dim_latent, 
+            word_dropout=args.word_dropout,
+            dropout=args.dropout,
+            sos_idx=w2i['<sos>'],
+            eos_idx=w2i['<eos>'],
+            pad_idx=w2i['<pad>'],
+            unk_idx=w2i['<unk>'],
+            max_sequence_length=args.max_sequence_length).to(device)
+    else:
+        raise ValueError
 
     if not os.path.exists(args.load_checkpoint):
         raise FileNotFoundError(args.load_checkpoint)
@@ -40,49 +59,54 @@ def main(args):
     # sample
     print('----------SAMPLES----------')
     model.eval()
-    z = torch.randn(args.num_samples, args.latent_size)
-    output = model.infer(z)
-    for i in range(len(output)):
-        print(decode_sentnece_from_token(output[i].tolist(), i2w, w2i['<eos>']))
+    zs = torch.randn(args.num_samples, args.dim_latent)
+    for i in range(len(zs)):
+        z = zs[i].unsqueeze(0)
+        output = model.infer(z)
+        print(decode_sentnece_from_token(output[0].tolist(), i2w))
     print()
 
     print('-------INTERPOLATION-------')
-    z1 = torch.randn([args.latent_size]).numpy()
-    z2 = torch.randn([args.latent_size]).numpy()
-    interpolation = np.zeros((args.latent_size, args.num_samples))
+    z1 = torch.randn([args.dim_latent]).numpy()
+    z2 = torch.randn([args.dim_latent]).numpy()
+    interpolation = np.zeros((args.dim_latent, args.num_samples))
     for dim, (s,e) in enumerate(zip(z1,z2)):
         interpolation[dim] = np.linspace(s, e, args.num_samples)
     interpolation = interpolation.T
 
-    z = torch.from_numpy(interpolation).float()
-    output = model.infer(z)
-    for i in range(len(output)):
-        print(decode_sentnece_from_token(output[i].tolist(), i2w, w2i['<eos>']))
+    zs = torch.from_numpy(interpolation).float()
+    for i in range(len(zs)):
+        z = zs[i].unsqueeze(0)
+        output = model.infer(z)
+        print(decode_sentnece_from_token(output[0].tolist(), i2w))
 
     
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--load_checkpoint', type=str)
     parser.add_argument('-n', '--num_samples', type=int, default=10)
 
-    parser.add_argument('-dd', '--data_dir', type=str, default='data')
-    parser.add_argument('-ms', '--max_sequence_length', type=int, default=50)
-    parser.add_argument('-eb', '--embedding_size', type=int, default=300)
-    parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
-    parser.add_argument('-hs', '--hidden_size', type=int, default=256)
-    parser.add_argument('-wd', '--word_dropout', type=float, default=0)
-    parser.add_argument('-do', '--dropout', type=float, default=0.5)
-    parser.add_argument('-ls', '--latent_size', type=int, default=64)
+    parser.add_argument('--data_dir', type=str, default='data')
+    parser.add_argument('--max_sequence_length', type=int, default=60)
+
+    # model settings
+    parser.add_argument('-dl', '--dim_latent', type=int, default=64)
     parser.add_argument('-nl', '--num_layers', type=int, default=1)
+    parser.add_argument('-wd', '--word_dropout', type=float, default=0.6)
+    parser.add_argument('-do', '--dropout', type=float, default=0.5)
+
+    # rnn settings
+    parser.add_argument('-de', '--dim_embedding', type=int, default=300)
+    parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
+    parser.add_argument('-dh', '--dim_hidden', type=int, default=256)
     parser.add_argument('-bi', '--bidirectional', action='store_true')
 
+    # transformer settings
+    parser.add_argument('-dm', '--dim_model', type=int, default=256)
+    parser.add_argument('-nh', '--nhead', type=int, default=4)
+    parser.add_argument('-df', '--dim_feedforward', type=int, default=256)
+
     args = parser.parse_args()
-
-    args.rnn_type = args.rnn_type.lower()
-
-    assert args.rnn_type in ['rnn', 'lstm', 'gru']
-    assert 0 <= args.word_dropout <= 1
 
     main(args)

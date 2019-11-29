@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader
 from collections import OrderedDict, defaultdict
 from tqdm import tqdm
 
-# from ptb import PTB
 from dataset import ParaphraseDataset, collate_fn
-from models.vae import VAE
+from models.rnn_vae import RNNVAE
+from models.transformer_vae import TransformerVAE
 from loss import MaskedCrossEntropyLoss, KLLoss
 
 device = torch.device("cuda" if torch.cuda.is_available else "cpu")
@@ -24,48 +24,56 @@ def kl_anneal_function(anneal_function, step, k, x0):
         return min(1, step/x0)
 
 
+def load_dataset(data_dir, split, batch_size):
+    dataset = ParaphraseDataset(data_dir=data_dir, split=split)
+    loader = DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=(split=='train'),
+        collate_fn=collate_fn,
+        num_workers=cpu_count(),
+        pin_memory=torch.cuda.is_available())
+    return dataset, loader
+
+
 def main(args):
-    train_dataset = ParaphraseDataset(
-        data_dir=args.data_dir,
-        split='train',
-        max_sequence_length=args.max_sequence_length)
-    val_dataset = ParaphraseDataset(
-        data_dir=args.data_dir,
-        split='valid',
-        max_sequence_length=args.max_sequence_length)
+    train_dataset, train_loader = load_dataset(args.data_dir, 'train', args.batch_size)
+    val_dataset, val_loader = load_dataset(args.data_dir, 'valid', args.batch_size)
 
-    train_loader = DataLoader(
-        dataset=train_dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        collate_fn=collate_fn,
-        num_workers=cpu_count(),
-        pin_memory=torch.cuda.is_available())
-    val_loader = DataLoader(
-        dataset=val_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        collate_fn=collate_fn,
-        num_workers=cpu_count(),
-        pin_memory=torch.cuda.is_available())
+    if args.model == 'rnn':
+        model = RNNVAE(
+            rnn_type=args.rnn_type,
+            num_embeddings=train_dataset.vocab_size,
+            dim_embedding=args.dim_embedding,
+            dim_hidden=args.dim_hidden, 
+            num_layers=args.num_layers,
+            bidirectional=args.bidirectional, 
+            dim_latent=args.dim_latent, 
+            word_dropout=args.word_dropout,
+            dropout=args.dropout,
+            sos_idx=train_dataset.sos_idx,
+            eos_idx=train_dataset.eos_idx,
+            pad_idx=train_dataset.pad_idx,
+            unk_idx=train_dataset.unk_idx,
+            max_sequence_length=args.max_sequence_length).to(device)
+    elif args.model == 'transformer':
+        model = TransformerVAE(
+            num_embeddings=train_dataset.vocab_size,
+            dim_model=args.dim_model,
+            nhead=args.nhead,
+            dim_feedforward=args.dim_feedforward,
+            num_layers=args.num_layers,
+            dim_latent=args.dim_latent, 
+            word_dropout=args.word_dropout,
+            dropout=args.dropout,
+            sos_idx=train_dataset.sos_idx,
+            eos_idx=train_dataset.eos_idx,
+            pad_idx=train_dataset.pad_idx,
+            unk_idx=train_dataset.unk_idx,
+            max_sequence_length=args.max_sequence_length).to(device)
+    else:
+        raise ValueError
 
-    model = VAE(
-        vocab_size=train_dataset.vocab_size,
-        sos_idx=train_dataset.sos_idx,
-        eos_idx=train_dataset.eos_idx,
-        pad_idx=train_dataset.pad_idx,
-        unk_idx=train_dataset.unk_idx,
-        max_sequence_length=args.max_sequence_length,
-        embedding_size=args.embedding_size,
-        rnn_type=args.rnn_type,
-        hidden_size=args.hidden_size,
-        word_dropout=args.word_dropout,
-        dropout=args.dropout,
-        latent_size=args.latent_size,
-        num_layers=args.num_layers,
-        bidirectional=args.bidirectional).to(device)
-
-    
     print(model)
 
     save_model_path = os.path.join(args.save_model_path)
@@ -112,7 +120,7 @@ def main(args):
         torch.save(model.state_dict(), checkpoint_path)
 
         model.eval()
-        tracker = {'ELBO': [], 'z': []}
+        tracker = {'ELBO': []}
         with torch.no_grad():
             for iteration, (input, target, length) in enumerate(val_loader):
                 input = input.to(device)
@@ -137,37 +145,37 @@ if __name__ == '__main__':
 
     parser.add_argument('--data_dir', type=str, default='data')
     parser.add_argument('--max_sequence_length', type=int, default=60)
-    parser.add_argument('--min_occ', type=int, default=1)
 
-    parser.add_argument('-ep', '--epochs', type=int, default=30)
-    parser.add_argument('-bs', '--batch_size', type=int, default=64)
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.0005)
-
-    parser.add_argument('-eb', '--embedding_size', type=int, default=300)
-    parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
-    parser.add_argument('-hs', '--hidden_size', type=int, default=256)
+    # model settings
+    parser.add_argument('-m', '--model', type=str, required=True)
+    parser.add_argument('-dl', '--dim_latent', type=int, default=64)
     parser.add_argument('-nl', '--num_layers', type=int, default=1)
-    parser.add_argument('-bi', '--bidirectional', action='store_true')
-    parser.add_argument('-ls', '--latent_size', type=int, default=64)
     parser.add_argument('-wd', '--word_dropout', type=float, default=0.6)
     parser.add_argument('-do', '--dropout', type=float, default=0.5)
 
+    # rnn settings
+    parser.add_argument('-de', '--dim_embedding', type=int, default=300)
+    parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
+    parser.add_argument('-dh', '--dim_hidden', type=int, default=256)
+    parser.add_argument('-bi', '--bidirectional', action='store_true')
+
+    # transformer settings
+    parser.add_argument('-dm', '--dim_model', type=int, default=256)
+    parser.add_argument('-nh', '--nhead', type=int, default=4)
+    parser.add_argument('-df', '--dim_feedforward', type=int, default=256)
+
+    # training settings
+    parser.add_argument('-ep', '--epochs', type=int, default=30)
+    parser.add_argument('-bs', '--batch_size', type=int, default=64)
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.0005)
     parser.add_argument('-af', '--anneal_function', type=str, default='logistic')
     parser.add_argument('-k', '--k', type=float, default=0.0025)
     parser.add_argument('-x0', '--x0', type=int, default=2500)
 
     parser.add_argument('-v','--print_every', type=int, default=50)
-    parser.add_argument('-tb','--tensorboard_logging', action='store_true')
     parser.add_argument('-log','--logdir', type=str, default='logs')
     parser.add_argument('-save','--save_model_path', type=str, default='save')
 
     args = parser.parse_args()
-
-    args.rnn_type = args.rnn_type.lower()
-    args.anneal_function = args.anneal_function.lower()
-
-    assert args.rnn_type in ['rnn', 'lstm', 'gru']
-    assert args.anneal_function in ['logistic', 'linear']
-    assert 0 <= args.word_dropout <= 1
 
     main(args)

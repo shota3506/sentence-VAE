@@ -1,9 +1,7 @@
 import os
-import io
 import json
 import torch
 from torch.utils.data import Dataset
-from nltk.tokenize import TweetTokenizer
 
 
 def collate_fn(data):
@@ -16,7 +14,6 @@ class ParaphraseDataset(Dataset):
         super().__init__()
         self.data_dir = data_dir
         self.split = split
-        self.max_sequence_length = kwargs.get('max_sequence_length', 50)
         
         vocab_file = os.path.join(data_dir, "vocab.json")
         data_file = os.path.join(data_dir, "%s.json" % split)
