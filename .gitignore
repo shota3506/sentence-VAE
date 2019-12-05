@@ -1,6 +1,6 @@
 __pycache__
 save
 data
-simple-examples
+result
 *.sh
 !downloaddata.sh

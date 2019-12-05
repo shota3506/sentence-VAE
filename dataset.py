@@ -19,7 +19,7 @@ class QuoraDataset(Dataset):
         self.questions = json.load(open(question_file, 'r'))
         self.vocab = json.load(open(vocab_file, 'r'))
 
-        self.questions = {i: self.questions[i] for i in self.idx}
+        self.questions = {i: self.questions[i] for i in self.idx + [d['reference'] for d in self.data]}
 
     def __len__(self):
         return len(self.idx)

@@ -2,9 +2,7 @@ import os
 import json
 import torch
 import argparse
-import numpy as np
-from torch.utils.data import DataLoader
-from multiprocessing import cpu_count
+from tqdm import tqdm
 
 from dataset import QuoraDataset, collate_fn
 from models.vae import VAE
@@ -19,14 +17,6 @@ def main(args):
     vocab_file = os.path.join(args.data_dir, 'vocab.json')
 
     dataset = QuoraDataset(os.path.join(args.data_dir, 'test.json'), question_file, vocab_file)
-    loader = DataLoader(
-        dataset=dataset,
-        batch_size=1,
-        shuffle=False,
-        collate_fn=collate_fn,
-        num_workers=4,
-        drop_last=True,
-        pin_memory=torch.cuda.is_available())
 
     sos_idx = dataset.vocab['w2i']['<sos>']
     eos_idx = dataset.vocab['w2i']['<eos>']
@@ -52,30 +42,56 @@ def main(args):
     model.load_state_dict(torch.load(args.load_checkpoint))
     print("Model loaded from %s"%(args.load_checkpoint))
 
-    ce_criterion = MaskedCrossEntropyLoss()
-    kl_criterion = KLLoss()
-
-    model.eval()    
+    originals = []
+    outputs = []
+    references = []
+    print("Evaluating...")
+    model.eval()
     with torch.no_grad():
-        for input, target, length in loader:
-            input = input.to(device)
-            target = target.to(device)
-            length = length.to(device)
+        pbar = dataset.data if args.print else tqdm(dataset.data)
+        for d in pbar:
+            original_id = d['original']
+            reference_id = d['reference']
+
+            input = torch.tensor([dataset.questions[original_id]['input']]).to(device)
+            target = torch.tensor([dataset.questions[original_id]['target']]).to(device)
+            length = torch.tensor([dataset.questions[original_id]['length']]).to(device)
+            ref = torch.tensor([dataset.questions[reference_id]['target']]).to(device)
 
             mean, logvar = model.encode(input, length)
             z = model.reparameterize(mean, logvar)
             ys = model.infer(z)
 
-            print("-" * 100 + "\n")
-            print("Source: %s\nOutput: %s\n" \
-                 % (decode_sentnece_from_token(target[0].tolist(), dataset.vocab['i2w'], eos_idx),
-                 decode_sentnece_from_token(ys[0].tolist(), dataset.vocab['i2w'], eos_idx)))
+            original = decode_sentnece_from_token(target[0].tolist(), dataset.vocab['i2w'], eos_idx)
+            output = decode_sentnece_from_token(ys[0].tolist(), dataset.vocab['i2w'], eos_idx)
+            reference = decode_sentnece_from_token(ref[0].tolist(), dataset.vocab['i2w'], eos_idx)
+
+            originals.append(original)
+            outputs.append(output)
+            references.append(reference)
+
+            if args.print:
+                print("-" * 100 + "\n")
+                print("Original:  %s\nOutput:    %s\nReference: %s\n"  % (original, output, reference))
+    
+    print("Saving...")
+
+    with open(os.path.join(args.output_dir, 'original.txt'), 'w') as f:
+        f.write("\n".join(originals))
+    with open(os.path.join(args.output_dir, 'output.txt'), 'w') as f:
+        f.write("\n".join(outputs))
+    with open(os.path.join(args.output_dir, 'reference.txt'), 'w') as f:
+        f.write("\n".join(references))
+
+    print("Done")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--load_checkpoint', type=str)
+    parser.add_argument('-p', '--print', action='store_true')
+    parser.add_argument('--output_dir', type=str, required=True)
 
     parser.add_argument('--data_dir', type=str, default='data')
     parser.add_argument('--max_sequence_length', type=int, default=50)
