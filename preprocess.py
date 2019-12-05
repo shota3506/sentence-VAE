@@ -1,11 +1,8 @@
 import os
 import json
 import argparse
-from nltk.tokenize import TweetTokenizer
+import pandas as pd
 from collections import defaultdict, Counter, OrderedDict
-from tqdm import tqdm
-
-tokenizer = TweetTokenizer(preserve_case=False)
 
 
 class OrderedCounter(Counter, OrderedDict):
@@ -17,23 +14,20 @@ class OrderedCounter(Counter, OrderedDict):
         return self.__class__, (OrderedDict(self),)
 
 
-def create_vocab(data_file, min_occ=1):
+def create_vocab(questions, idx, min_occ=1):
     special_tokens = ['<pad>', '<unk>', '<sos>', '<eos>']
-
     counter = OrderedCounter()
     w2i = {}
     i2w = []
+    for i in idx:
+        question = questions[i]
+        tokens = [token.lower() for s in question['annotation'] for token in s['tokens']]
+        counter.update(tokens)            
 
     for token in special_tokens:
         idx = len(w2i)
         i2w.append(token)
         w2i[token] = idx
-
-    with open(data_file, 'r') as f:
-        for i, line in enumerate(f):
-            words = tokenizer.tokenize(line)
-            counter.update(words)
-
     for token, c in counter.items():
         if c > min_occ and token not in special_tokens:
             idx = len(w2i)
@@ -41,63 +35,70 @@ def create_vocab(data_file, min_occ=1):
             w2i[token] = idx
     
     assert len(w2i) == len(i2w)
-    vocab = dict(w2i=w2i, i2w=i2w)
+    vocab = dict(w2i=w2i, i2w=i2w, min_occ=min_occ)
     return vocab
 
 
-def create_data(data_file, vocab, max_sequence_length):
-    data = []
+def preprocess(questions, vocab, max_sequence_length=50):
     w2i = vocab['w2i']
-    with open(data_file, 'r') as f:
-        pbar = tqdm(f)
-        pbar.set_description('Preprocess %s' % data_file)
-        for i, line in enumerate(pbar):
-            words = tokenizer.tokenize(line)
-            input = ['<sos>'] + words
-            input = input[:max_sequence_length]
 
-            target = words[:max_sequence_length-1]
-            target = target + ['<eos>']
+    idx = list(questions.keys())
 
-            assert len(input) == len(target), "%i, %i"%(len(input), len(target))
-            length = len(input)
+    preprocessed_questions = {}
+    for i in idx:
+        question = questions[i]
+        tokens = [token.lower() for s in question['annotation'] for token in s['tokens']]
 
-            input.extend(['<pad>'] * (max_sequence_length-length))
-            target.extend(['<pad>'] * (max_sequence_length-length))
+        input = ['<sos>'] + tokens
+        input = input[:max_sequence_length]
+        target = tokens[:max_sequence_length-1]
+        target = target + ['<eos>']
+        length = len(input)
 
-            input = [w2i.get(w, w2i['<unk>']) for w in input]
-            target = [w2i.get(w, w2i['<unk>']) for w in target]
+        assert len(input) == len(target)
+        
+        input.extend(['<pad>'] * (max_sequence_length - length))
+        input = [w2i.get(token, w2i['<unk>'])for token in input]
+        target.extend(['<pad>'] * (max_sequence_length - length))
+        target = [w2i.get(token, w2i['<unk>'])for token in target]
 
-            id = len(data)
-            data.append({'input': input, 'target': target, 'length': length})
-    return data
+        preprocessed_questions[i] = {
+            'input': input,
+            'target': target,
+            'length': length
+        }
 
+    return preprocessed_questions
 
 def main(args):
-    train_file = os.path.join(args.path, 'train.txt')
-    valid_file = os.path.join(args.path, 'valid.txt')
-    test_file = os.path.join(args.path, 'test.txt')
-
+    questions = json.load(open(os.path.join(args.data_dir, 'annotated_questions.json'), 'r'))
+    
+    df = pd.read_csv(args.train_file)
+    train_idx = set()
+    for i, row in df.iterrows():
+        train_idx.add(str(row['qid1']))
+        train_idx.add(str(row['qid2']))
+    train_idx = list(train_idx)
     print("Creating vocab...")
-    vocab = create_vocab(train_file, min_occ=args.min_occ)
-    print("Vocab size: %d" % len(vocab['i2w']))
-    json.dump(vocab, open(os.path.join(args.path, 'vocab.json'), 'w'))
+    vocab = create_vocab(questions, train_idx, min_occ=args.min_occ)
+    print("Vocab size: %d" % len(vocab['w2i']))
 
-    train_data = create_data(train_file, vocab, args.max_sequence_length)
-    valid_data = create_data(valid_file, vocab, args.max_sequence_length)
-    test_data = create_data(test_file, vocab, args.max_sequence_length)
-
-    json.dump(train_data, open(os.path.join(args.path, 'train.json'), 'w'))
-    json.dump(valid_data, open(os.path.join(args.path, 'valid.json'), 'w'))
-    json.dump(test_data, open(os.path.join(args.path, 'test.json'), 'w'))
+    print("Preprocessing data...")
+    preprocessed_questions = preprocess(questions, vocab, max_sequence_length=args.max_sequence_length)
+    
+    print("Dumping data...")
+    json.dump(vocab, open(os.path.join(args.data_dir, 'vocab.json'), 'w'))
+    json.dump(preprocessed_questions, open(os.path.join(args.data_dir, 'preprocessed_questions.json'), 'w'))
+    print("Done")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--path', type=str, default='data/ptb')
-    parser.add_argument('--max_sequence_length', type=int, default=60)
+    parser.add_argument('--data_dir', type=str, default='data/quora')
+    parser.add_argument('--train_file', type=str, default='data/quora/train.csv')
     parser.add_argument('--min_occ', type=int, default=1)
+    parser.add_argument('--max_sequence_length', type=int, default=50)
 
     args = parser.parse_args()
 

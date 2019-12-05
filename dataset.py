@@ -6,58 +6,29 @@ from torch.utils.data import Dataset
 
 def collate_fn(data):
     data.sort(key=lambda x: x['length'], reverse=True)
-    return torch.stack([d['input'] for d in data]), torch.stack([d['target'] for d in data]), torch.tensor([d['length'] for d in data])
+    return torch.tensor([d['input'] for d in data]), torch.tensor([d['target'] for d in data]), \
+        torch.tensor([d['length'] for d in data])
 
 
-class ParaphraseDataset(Dataset):
-    def __init__(self, data_dir, split, **kwargs):
+class QuoraDataset(Dataset):
+    def __init__(self, data_file, question_file, vocab_file):
         super().__init__()
-        self.data_dir = data_dir
-        self.split = split
-        
-        vocab_file = os.path.join(data_dir, "vocab.json")
-        data_file = os.path.join(data_dir, "%s.json" % split)
+        self.data = json.load(open(data_file, 'r'))
+        self.idx = [d['original'] for d in self.data]
 
-        assert os.path.exists(vocab_file)
-        assert os.path.exists(data_file)
+        self.questions = json.load(open(question_file, 'r'))
+        self.vocab = json.load(open(vocab_file, 'r'))
 
-        self._load_vocab(vocab_file)
-        self._load_data(data_file)
+        self.questions = {i: self.questions[i] for i in self.idx}
 
     def __len__(self):
-        return len(self.data)
+        return len(self.idx)
 
-    def __getitem__(self, idx):
-        return {
-            'input': torch.tensor(self.data[idx]['input']), 
-            'target': torch.tensor(self.data[idx]['target']), 
-            'length': self.data[idx]['length']}
+    def __getitem__(self, i):
+        idx = self.idx[i] 
+        question = self.questions[idx]
+        return {'input': question['input'], 'target': question['target'], 'length': question['length']}
 
     @property
     def vocab_size(self):
-        return len(self.w2i)
-
-    @property
-    def pad_idx(self):
-        return self.w2i['<pad>']
-
-    @property
-    def sos_idx(self):
-        return self.w2i['<sos>']
-
-    @property
-    def eos_idx(self):
-        return self.w2i['<eos>']
-
-    @property
-    def unk_idx(self):
-        return self.w2i['<unk>']
-
-    def _load_vocab(self, vocab_file):
-        vocab = json.load(open(vocab_file, 'r'))
-        self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
-
-    def _load_data(self, data_file):
-        self.data = json.load(open(data_file, 'r'))
-
-
+        return len(self.vocab['i2w'])

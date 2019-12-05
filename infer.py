@@ -4,8 +4,7 @@ import torch
 import argparse
 import numpy as np
 
-from models.rnn_vae import RNNVAE
-from models.transformer_vae import TransformerVAE
+from models.vae import VAE
 from utils import decode_sentnece_from_token
 
 
@@ -15,46 +14,31 @@ def main(args):
 
     w2i, i2w = vocab['w2i'], vocab['i2w']
 
-    if args.model == 'rnn':
-        model = RNNVAE(
-            rnn_type=args.rnn_type,
-            num_embeddings=len(w2i),
-            dim_embedding=args.dim_embedding,
-            dim_hidden=args.dim_hidden, 
-            num_layers=args.num_layers,
-            bidirectional=args.bidirectional, 
-            dim_latent=args.dim_latent, 
-            word_dropout=args.word_dropout,
-            dropout=args.dropout,
-            sos_idx=w2i['<sos>'],
-            eos_idx=w2i['<eos>'],
-            pad_idx=w2i['<pad>'],
-            unk_idx=w2i['<unk>'],
-            max_sequence_length=args.max_sequence_length).to(device)
-    elif args.model == 'transformer':
-        model = TransformerVAE(
-            num_embeddings=len(w2i),
-            dim_model=args.dim_model,
-            nhead=args.nhead,
-            dim_feedforward=args.dim_feedforward,
-            num_layers=args.num_layers,
-            dim_latent=args.dim_latent, 
-            word_dropout=args.word_dropout,
-            dropout=args.dropout,
-            sos_idx=w2i['<sos>'],
-            eos_idx=w2i['<eos>'],
-            pad_idx=w2i['<pad>'],
-            unk_idx=w2i['<unk>'],
-            max_sequence_length=args.max_sequence_length).to(device)
-    else:
-        raise ValueError
+    sos_idx = vocab['w2i']['<sos>']
+    eos_idx = vocab['w2i']['<eos>']
+    pad_idx = vocab['w2i']['<pad>']
+    unk_idx = vocab['w2i']['<unk>']
+    model = VAE(
+        rnn_type=args.rnn_type,
+        num_embeddings=len(w2i),
+        dim_embedding=args.dim_embedding,
+        dim_hidden=args.dim_hidden, 
+        num_layers=args.num_layers,
+        bidirectional=args.bidirectional, 
+        dim_latent=args.dim_latent, 
+        word_dropout=args.word_dropout,
+        dropout=args.dropout,
+        sos_idx=sos_idx,
+        eos_idx=eos_idx,
+        pad_idx=pad_idx,
+        unk_idx=unk_idx,
+        max_sequence_length=args.max_sequence_length)
 
     if not os.path.exists(args.load_checkpoint):
         raise FileNotFoundError(args.load_checkpoint)
 
     model.load_state_dict(torch.load(args.load_checkpoint))
     print("Model loaded from %s\n"%(args.load_checkpoint))
-
 
     # sample
     print('----------SAMPLES----------')
@@ -63,7 +47,7 @@ def main(args):
     for i in range(len(zs)):
         z = zs[i].unsqueeze(0)
         output = model.infer(z)
-        print(decode_sentnece_from_token(output[0].tolist(), i2w))
+        print(decode_sentnece_from_token(output[0].tolist(), i2w, eos_idx))
     print()
 
     print('-------INTERPOLATION-------')
@@ -78,7 +62,7 @@ def main(args):
     for i in range(len(zs)):
         z = zs[i].unsqueeze(0)
         output = model.infer(z)
-        print(decode_sentnece_from_token(output[0].tolist(), i2w))
+        print(decode_sentnece_from_token(output[0].tolist(), i2w, eos_idx))
 
     
 if __name__ == '__main__':
@@ -88,7 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num_samples', type=int, default=10)
 
     parser.add_argument('--data_dir', type=str, default='data')
-    parser.add_argument('--max_sequence_length', type=int, default=60)
+    parser.add_argument('--max_sequence_length', type=int, default=50)
 
     # model settings
     parser.add_argument('-dl', '--dim_latent', type=int, default=64)
@@ -101,11 +85,6 @@ if __name__ == '__main__':
     parser.add_argument('-rnn', '--rnn_type', type=str, default='gru')
     parser.add_argument('-dh', '--dim_hidden', type=int, default=256)
     parser.add_argument('-bi', '--bidirectional', action='store_true')
-
-    # transformer settings
-    parser.add_argument('-dm', '--dim_model', type=int, default=256)
-    parser.add_argument('-nh', '--nhead', type=int, default=4)
-    parser.add_argument('-df', '--dim_feedforward', type=int, default=256)
 
     args = parser.parse_args()
 

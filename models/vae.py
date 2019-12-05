@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 
 
-class RNNVAE(nn.Module):
+class VAE(nn.Module):
     def __init__(self, rnn_type, num_embeddings, dim_embedding, dim_hidden, num_layers, bidirectional, dim_latent, word_dropout, dropout,
                 sos_idx, eos_idx, pad_idx, unk_idx, max_sequence_length):
-        super(RNNVAE, self).__init__()
+        super(VAE, self).__init__()
         self.dim_hidden = dim_hidden
         self.num_layers = num_layers
         self.bidirectional = bidirectional
@@ -94,5 +94,7 @@ class RNNVAE(nn.Module):
             _, next_word = torch.max(output, dim=1)
             ys = torch.cat([ys, torch.ones(1, 1).fill_(next_word.item()).long().to(device)], dim=0)
             input = torch.ones(1, 1).fill_(next_word.item()).long().to(device)
+
+        ys = ys[1:].transpose(0, 1)
             
-        return ys.transpose(0, 1)
+        return ys

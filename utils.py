@@ -1,29 +1,10 @@
-import torch
-from torch.utils.data import DataLoader
-from multiprocessing import cpu_count
-from dataset import ParaphraseDataset, collate_fn
-
-
-def load_dataset(data_dir, split, batch_size):
-    dataset = ParaphraseDataset(data_dir=data_dir, split=split)
-    loader = DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=(split=='train'),
-        collate_fn=collate_fn,
-        num_workers=cpu_count(),
-        pin_memory=torch.cuda.is_available())
-    return dataset, loader
-
-
-def decode_sentnece_from_token(tokens, i2w):
-    sentence = ""
+def decode_sentnece_from_token(tokens, i2w, eos_idx):
+    sentence = []
     for t in tokens:
-        w = i2w[t]
-        if w == "<pad>" or w == "<eos>":
+        if t == eos_idx:
             break
-        sentence += " " + w
-    return sentence
+        sentence.append(i2w[t])
+    return " ".join(sentence)
 
 
 def expierment_name(args, ts):
