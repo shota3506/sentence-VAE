@@ -1,7 +1,6 @@
 import os
 import json
 import argparse
-import pandas as pd
 from collections import defaultdict, Counter, OrderedDict
 
 
@@ -73,14 +72,11 @@ def preprocess(questions, vocab, max_sequence_length=50):
 def main(args):
     questions = json.load(open(os.path.join(args.data_dir, 'annotated_questions.json'), 'r'))
     
-    df = pd.read_csv(args.train_file)
-    train_idx = set()
-    for i, row in df.iterrows():
-        train_idx.add(str(row['qid1']))
-        train_idx.add(str(row['qid2']))
-    train_idx = list(train_idx)
+    data = json.load(open(args.train_file, 'r'))
+    idx = [d['original'] for d in data]
+
     print("Creating vocab...")
-    vocab = create_vocab(questions, train_idx, min_occ=args.min_occ)
+    vocab = create_vocab(questions, idx, min_occ=args.min_occ)
     print("Vocab size: %d" % len(vocab['w2i']))
 
     print("Preprocessing data...")
@@ -96,7 +92,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data_dir', type=str, default='data/quora')
-    parser.add_argument('--train_file', type=str, default='data/quora/train.csv')
+    parser.add_argument('--train_file', type=str, default='data/quora/train.json')
     parser.add_argument('--min_occ', type=int, default=1)
     parser.add_argument('--max_sequence_length', type=int, default=50)
 

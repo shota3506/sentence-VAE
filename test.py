@@ -43,7 +43,7 @@ def main(args):
     print("Model loaded from %s"%(args.load_checkpoint))
 
     originals = []
-    outputs = []
+    hypotheses = []
     references = []
     print("Evaluating...")
     model.eval()
@@ -63,23 +63,23 @@ def main(args):
             ys = model.infer(z)
 
             original = decode_sentnece_from_token(target[0].tolist(), dataset.vocab['i2w'], eos_idx)
-            output = decode_sentnece_from_token(ys[0].tolist(), dataset.vocab['i2w'], eos_idx)
+            hypothesis = decode_sentnece_from_token(ys[0].tolist(), dataset.vocab['i2w'], eos_idx)
             reference = decode_sentnece_from_token(ref[0].tolist(), dataset.vocab['i2w'], eos_idx)
 
             originals.append(original)
-            outputs.append(output)
+            hypotheses.append(hypothesis)
             references.append(reference)
 
             if args.print:
                 print("-" * 100 + "\n")
-                print("Original:  %s\nOutput:    %s\nReference: %s\n"  % (original, output, reference))
+                print("Original:   %s\nHypothesis: %s\nReference:  %s\n"  % (original, hypothesis, reference))
     
     print("Saving...")
 
     with open(os.path.join(args.output_dir, 'original.txt'), 'w') as f:
         f.write("\n".join(originals))
-    with open(os.path.join(args.output_dir, 'output.txt'), 'w') as f:
-        f.write("\n".join(outputs))
+    with open(os.path.join(args.output_dir, 'hypothesis.txt'), 'w') as f:
+        f.write("\n".join(hypotheses))
     with open(os.path.join(args.output_dir, 'reference.txt'), 'w') as f:
         f.write("\n".join(references))
 
