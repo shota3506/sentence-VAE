@@ -8,10 +8,10 @@ def main(args):
     hypotheses = []
     references = []
 
-    with open(os.path.join(args.data_dir, 'hypothesis.txt'), 'r') as f:
+    with open(args.hypothesis_file, 'r') as f:
         for line in f:
             hypotheses.append(line.strip())
-    with open(os.path.join(args.data_dir, 'reference.txt'), 'r') as f:
+    with open(args.reference_file, 'r') as f:
         for line in f:
             references.append(line.strip())
 
@@ -68,7 +68,8 @@ def evaluate_rouge(hypotheses, references, max_n=4):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--data_dir', type=str, default='result')
+    parser.add_argument('-hyp', '--hypothesis_file', type=str, required=True)
+    parser.add_argument('-ref', '--reference_file', type=str, required=True)
 
     args = parser.parse_args()
 

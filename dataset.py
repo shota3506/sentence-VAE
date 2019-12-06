@@ -10,24 +10,38 @@ def collate_fn(data):
         torch.tensor([d['length'] for d in data])
 
 
-class QuoraDataset(Dataset):
-    def __init__(self, data_file, question_file, vocab_file):
+class SentenceDataset(Dataset):
+    def __init__(self, data_file, vocab_file, max_sequence_length):
         super().__init__()
-        self.data = json.load(open(data_file, 'r'))
-        self.idx = [d['original'] for d in self.data]
+        self.data = []
+        with open(data_file, 'r') as f:
+            for line in f:
+                self.data.append(line.strip().lower().split())
 
-        self.questions = json.load(open(question_file, 'r'))
         self.vocab = json.load(open(vocab_file, 'r'))
-
-        self.questions = {i: self.questions[i] for i in self.idx + [d['reference'] for d in self.data]}
+        self.max_sequence_length = max_sequence_length
 
     def __len__(self):
-        return len(self.idx)
+        return len(self.data)
 
-    def __getitem__(self, i):
-        idx = self.idx[i] 
-        question = self.questions[idx]
-        return {'input': question['input'], 'target': question['target'], 'length': question['length']}
+    def __getitem__(self, idx):
+        tokens = self.data[idx]
+
+        input = ['<sos>'] + tokens
+        input = input[:self.max_sequence_length]
+        target = tokens[:self.max_sequence_length-1]
+        target = target + ['<eos>']
+
+        length = len(input)
+
+        input.extend(['<pad>'] * (self.max_sequence_length - length))
+        target.extend(['<pad>'] * (self.max_sequence_length - length))
+
+        w2i = self.vocab['w2i']
+        input = [w2i.get(token, w2i['<unk>'])for token in input]
+        target = [w2i.get(token, w2i['<unk>'])for token in target]
+      
+        return {'input': input, 'target': target, 'length': length}
 
     @property
     def vocab_size(self):

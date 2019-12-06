@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 from collections import OrderedDict, defaultdict
 from tqdm import tqdm
 
-from dataset import QuoraDataset, collate_fn
-from models.vae import VAE
+from dataset import SentenceDataset, collate_fn
+from model import VAE
 from loss import MaskedCrossEntropyLoss, KLLoss
 
 device = torch.device("cuda" if torch.cuda.is_available else "cpu")
@@ -24,11 +24,8 @@ def kl_anneal_function(anneal_function, step, k, x0):
 
 
 def main(args):
-    question_file = os.path.join(args.data_dir, 'preprocessed_questions.json')
-    vocab_file = os.path.join(args.data_dir, 'vocab.json')
-
-    train_dataset = QuoraDataset(os.path.join(args.data_dir, 'train.json'), question_file, vocab_file)
-    valid_dataset = QuoraDataset(os.path.join(args.data_dir, 'valid.json'), question_file, vocab_file)
+    train_dataset = SentenceDataset(os.path.join(args.data_dir, 'train.txt'), args.vocab_file, args.max_sequence_length)
+    valid_dataset = SentenceDataset(os.path.join(args.data_dir, 'valid.txt'), args.vocab_file, args.max_sequence_length)
     train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=args.batch_size,
@@ -134,6 +131,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data_dir', type=str, default='data')
+    parser.add_argument('--vocab_file', type=str, default='data/vocab.json')
     parser.add_argument('--max_sequence_length', type=int, default=50)
 
     # model settings

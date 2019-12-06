@@ -4,13 +4,12 @@ import torch
 import argparse
 import numpy as np
 
-from models.vae import VAE
+from model import VAE
 from utils import decode_sentnece_from_token
 
 
 def main(args):
-    vocab_file = os.path.join(args.data_dir, 'vocab.json')
-    vocab = json.load(open(vocab_file, 'r') )
+    vocab = json.load(open(args.vocab_file, 'r') )
 
     w2i, i2w = vocab['w2i'], vocab['i2w']
 
@@ -71,7 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--load_checkpoint', type=str)
     parser.add_argument('-n', '--num_samples', type=int, default=10)
 
-    parser.add_argument('--data_dir', type=str, default='data')
+    parser.add_argument('--vocab_file', type=str, default='data/vocab.json')
     parser.add_argument('--max_sequence_length', type=int, default=50)
 
     # model settings

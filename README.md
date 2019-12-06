@@ -1,0 +1,3 @@
+py-rouge
+nltk
+torch
