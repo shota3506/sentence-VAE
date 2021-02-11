@@ -3,46 +3,39 @@ import json
 import torch
 from torch.utils.data import Dataset
 
-
-def collate_fn(data):
-    data.sort(key=lambda x: x['length'], reverse=True)
-    return torch.tensor([d['input'] for d in data]), torch.tensor([d['target'] for d in data]), \
-        torch.tensor([d['length'] for d in data])
-
-
 class SentenceDataset(Dataset):
-    def __init__(self, data_file, vocab_file, max_sequence_length):
+    def __init__(
+        self,
+        data_file,
+        tokenizer,
+        max_length=50,
+        pad_index=0,
+        bos_index=1,
+        eos_index=2,
+        unk_index=3,
+    ) -> None:
         super().__init__()
-        self.data = []
+        self.max_length = max_length
+        self.tokenizer = tokenizer
+
+        self.pad_index = pad_index
+        self.unk_index = unk_index
+        self.bos_index = bos_index
+        self.eos_index = eos_index
+
         with open(data_file, 'r') as f:
-            for line in f:
-                self.data.append(line.strip().lower().split())
+            self._data = [line.strip() for line in f]
 
-        self.vocab = json.load(open(vocab_file, 'r'))
-        self.max_sequence_length = max_sequence_length
-
-    def __len__(self):
-        return len(self.data)
+    def __len__(self) -> int:
+        return len(self._data)
 
     def __getitem__(self, idx):
-        tokens = self.data[idx]
+        d = self._data[idx]
+        d = [self.bos_index] + self.tokenizer(d)[:self.max_length - 2] + [self.eos_index]
+        return d
 
-        input = ['<sos>'] + tokens
-        input = input[:self.max_sequence_length]
-        target = tokens[:self.max_sequence_length-1]
-        target = target + ['<eos>']
-
-        length = len(input)
-
-        input.extend(['<pad>'] * (self.max_sequence_length - length))
-        target.extend(['<pad>'] * (self.max_sequence_length - length))
-
-        w2i = self.vocab['w2i']
-        input = [w2i.get(token, w2i['<unk>'])for token in input]
-        target = [w2i.get(token, w2i['<unk>'])for token in target]
-      
-        return {'input': input, 'target': target, 'length': length}
-
-    @property
-    def vocab_size(self):
-        return len(self.vocab['i2w'])
+    @staticmethod
+    def collate_fn(data):
+        s = [torch.tensor(d) for d in data]
+        s = torch.nn.utils.rnn.pad_sequence(s, batch_first=True)
+        return s
