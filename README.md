@@ -11,3 +11,4 @@ python train.py \
 ```
 - ```train_file``` one-sentence-per-line raw corpus file for training.
 - ```valid_file``` one-sentence-per-line raw corpus file for validation.
+- ```vocab_file``` vocabulary file.
