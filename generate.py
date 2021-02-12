@@ -21,7 +21,7 @@ parser.add_argument("--vocab_file", type=str, required=True)
 # Model
 parser.add_argument('--dim_embedding', type=int, default=256)
 parser.add_argument('--dim_hidden', type=int, default=256)
-parser.add_argument('--dim_latent', type=int, default=256)
+parser.add_argument('--dim_latent', type=int, default=512)
 parser.add_argument('--num_layers', type=int, default=2)
 parser.add_argument('--bidirectional', action='store_true')
 parser.add_argument("--batch_size", type=int, default=128)
@@ -62,7 +62,8 @@ def main() -> None:
             bsz = s.shape[0]
 
             mean, logvar = model.encode(s, length)
-            z = model.reparameterize(mean, logvar)
+            # z = model.reparameterize(mean, logvar)
+            z = mean
 
             hidden = model.fc_hidden(z)
             hidden = hidden.view(bsz, -1, model.dim_hidden).transpose(0, 1).contiguous()

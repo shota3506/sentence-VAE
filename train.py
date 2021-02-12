@@ -1,4 +1,5 @@
 import os
+import math
 import argparse
 import logging
 from tqdm import tqdm
@@ -21,21 +22,21 @@ parser.add_argument('--vocab_file', type=str, required=True)
 # Model
 parser.add_argument('--dim_embedding', type=int, default=256)
 parser.add_argument('--dim_hidden', type=int, default=256)
-parser.add_argument('--dim_latent', type=int, default=256)
+parser.add_argument('--dim_latent', type=int, default=512)
 parser.add_argument('--num_layers', type=int, default=2)
 parser.add_argument('--bidirectional', action='store_true')
-parser.add_argument('--dropout', type=float, default=0.3)
-parser.add_argument('--word_dropout', type=float, default=0.5)
+parser.add_argument('--dropout', type=float, default=0.1)
+parser.add_argument('--word_dropout', type=float, default=0.25)
 # Optim
 parser.add_argument("--batch_size", type=int, default=128)
-parser.add_argument("--num_epochs", type=int, default=100)
-parser.add_argument('--learning_rate', type=float, default=0.0001)
+parser.add_argument("--num_epochs", type=int, default=50)
+parser.add_argument('--learning_rate', type=float, default=0.001)
 parser.add_argument("--print_every", type=int, default=100)
 parser.add_argument("--checkpoint_file", type=str, default="model.pth")
 parser.add_argument("--log_file", type=str, default="train.log")
 
-parser.add_argument('--x0', type=int, default=5000)
-parser.add_argument('--x1', type=int, default=10000)
+parser.add_argument('--k', type=float, default=0.0025)
+parser.add_argument('--x0', type=int, default=2500)
 
 args = parser.parse_args()
 
@@ -43,14 +44,14 @@ class KLAnnealer:
     def __init__(
         self,
         x0: int,
-        x1: int,
+        k: float,
     ) -> None:
         self._step = 0
         self._x0 = x0
-        self._x1 = x1
+        self._k = k
 
     def __call__(self) -> float:
-        return min(1., max(0., float((self._step - self._x0) / (self._x1 - self._x0))))
+        return float(1/(1 + math.exp(-self._k * (self._step - self._x0))))
 
     def step(self) -> None:
         self._step += 1
@@ -84,7 +85,7 @@ def main():
         dropped_index=tokenizer.unk_index,
     ).to(device)
 
-    annealer = KLAnnealer(x0=args.x0, x1=args.x1)
+    annealer = KLAnnealer(x0=args.x0, k=args.k)
 
     criterion = LmCrossEntropyLoss(tokenizer.pad_index, reduction='batchmean')
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.98), eps=1e-09)
