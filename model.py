@@ -30,8 +30,17 @@ class VAE(nn.Module):
         self.decoder = nn.GRU(
             dim_embedding, dim_hidden, num_layers=num_layers, dropout=(dropout if num_layers > 1 else 0), batch_first=True)
 
-        self.fc_mean =  nn.Linear(dim_hidden * (2 if bidirectional else 1) * num_layers, dim_latent)
-        self.fc_logvar =  nn.Linear(dim_hidden * (2 if bidirectional else 1) * num_layers, dim_latent)
+        dim_flatten = dim_hidden * (2 if bidirectional else 1) 
+        self.mlp_mean = nn.Sequential(
+            nn.Linear(dim_flatten, dim_flatten),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_flatten, dim_latent))
+        self.mlp_logvar = nn.Sequential(
+            nn.Linear(dim_flatten, dim_flatten),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_flatten, dim_latent))
 
         self.fc_hidden = nn.Linear(dim_latent, dim_hidden * num_layers)
         self.fc = nn.Linear(dim_hidden, num_embeddings)
@@ -61,10 +70,15 @@ class VAE(nn.Module):
         _, hidden = self.encoder(packed)
 
         # flatten hidden state
-        hidden = hidden.transpose(0, 1).contiguous().view(bsz, -1)
+        if self.bidirectional:
+           hidden = torch.cat((hidden[-1], hidden[-2]), dim=-1)
+        else:
+           hidden = hidden[-1]
 
-        mean = self.fc_mean(hidden)
-        logvar = self.fc_logvar(hidden)
+        # hidden = hidden.transpose(0, 1).contiguous().view(bsz, -1)
+
+        mean = self.mlp_mean(hidden)
+        logvar = self.mlp_logvar(hidden)
         return mean, logvar
 
     def decode(self, tgt, hidden):
@@ -85,26 +99,7 @@ class VAE(nn.Module):
         hidden = hidden.permute(1, 0, 2)
         return log_probabilities, {'hidden': hidden}
 
-    # def infer(self, z):
-        # device = z.device
-
-        # hidden = self.fc_hidden(z)
-        # hidden = hidden.view(1, -1, self.dim_hidden).transpose(0, 1).contiguous()
-
-        # ys = torch.ones(1, 1).fill_(self.sos_idx).long().to(device)
-        # input = torch.ones(1, 1).fill_(self.sos_idx).long().to(device)
-        # for i in range(self.max_sequence_length):
-            # embedded = self.embedding(input)
-            # output, hidden = self.decoder_rnn(embedded, hidden)
-            # output = self.fc(output)[-1]
-            # _, next_word = torch.max(output, dim=1)
-            # ys = torch.cat([ys, torch.ones(1, 1).fill_(next_word.item()).long().to(device)], dim=0)
-            # input = torch.ones(1, 1).fill_(next_word.item()).long().to(device)
-
-        # ys = ys[1:].transpose(0, 1)
             
-        # return ys
-
 class WordDropout(nn.Module):
     def __init__(
         self,
