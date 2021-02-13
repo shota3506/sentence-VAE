@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--vocab_file", type=str, required=True)
 # Model
 parser.add_argument('--dim_embedding', type=int, default=256)
-parser.add_argument('--dim_hidden', type=int, default=256)
+parser.add_argument('--dim_hidden', type=int, default=512)
 parser.add_argument('--dim_latent', type=int, default=512)
 parser.add_argument('--num_layers', type=int, default=2)
 parser.add_argument('--bidirectional', action='store_true')
