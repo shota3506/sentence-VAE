@@ -1,0 +1,25 @@
+[project]
+name = "sentence-vae"
+version = "0.1.0"
+description = ""
+dependencies = [
+    "tqdm>=4.66.2",
+    "torch>=2.2.1",
+    "numpy>=1.26.4",
+]
+readme = "README.md"
+requires-python = ">= 3.8"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sentence_vae"]

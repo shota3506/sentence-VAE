@@ -12,7 +12,7 @@ from dataset import SentenceDataset
 from tokenizer import Tokenizer
 from model import VAE
 
-device = torch.device("cuda" if torch.cuda.is_available else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 # Data
