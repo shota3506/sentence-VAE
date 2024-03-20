@@ -16,7 +16,10 @@ build-backend = "hatchling.build"
 
 [tool.rye]
 managed = true
-dev-dependencies = []
+dev-dependencies = [
+    "flake8>=7.0.0",
+    "black>=24.3.0",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true

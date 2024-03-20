@@ -1,11 +1,15 @@
 import torch
 
-from typing import List, Callable, Tuple, Dict, cast
+from typing import List, Callable, Tuple, Dict
 import warnings
 
 StateType = Dict[str, torch.Tensor]
-StepFunctionType = Callable[[torch.Tensor, StateType, int], Tuple[torch.Tensor, StateType]]
-StepFunctionTypeNoTimestep = Callable[[torch.Tensor, StateType], Tuple[torch.Tensor, StateType]]
+StepFunctionType = Callable[
+    [torch.Tensor, StateType, int], Tuple[torch.Tensor, StateType]
+]
+StepFunctionTypeNoTimestep = Callable[
+    [torch.Tensor, StateType], Tuple[torch.Tensor, StateType]
+]
 
 
 class BeamSearch:
@@ -67,7 +71,10 @@ class BeamSearch:
 
     @torch.no_grad()
     def search(
-        self, start_predictions: torch.Tensor, start_state: StateType, step: StepFunctionType
+        self,
+        start_predictions: torch.Tensor,
+        start_state: StateType,
+        step: StepFunctionType,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Given a starting state and a step function, apply beam search to find the
@@ -133,8 +140,8 @@ class BeamSearch:
         num_classes = start_class_log_probabilities.size()[1]
 
         # shape: (batch_size, beam_size), (batch_size, beam_size)
-        start_top_log_probabilities, start_predicted_classes = start_class_log_probabilities.topk(
-            self.beam_size
+        start_top_log_probabilities, start_predicted_classes = (
+            start_class_log_probabilities.topk(self.beam_size)
         )
         if self.beam_size == 1 and (start_predicted_classes == self.end_index).all():
             warnings.warn(
@@ -216,7 +223,9 @@ class BeamSearch:
             )
 
             # shape: (batch_size * beam_size, per_node_beam_size)
-            summed_top_log_probabilities = top_log_probabilities + expanded_last_log_probabilities
+            summed_top_log_probabilities = (
+                top_log_probabilities + expanded_last_log_probabilities
+            )
 
             # shape: (batch_size, beam_size * per_node_beam_size)
             reshaped_summed = summed_top_log_probabilities.reshape(
@@ -281,7 +290,9 @@ class BeamSearch:
                 RuntimeWarning,
             )
 
-        reconstructed_predictions = self.reconstruct_sequences(predictions, backpointers)
+        reconstructed_predictions = self.reconstruct_sequences(
+            predictions, backpointers
+        )
 
         # shape: (batch_size, beam_size, max_steps)
         all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
@@ -352,7 +363,10 @@ class DiverseBeamSearch:
 
     @torch.no_grad()
     def search(
-        self, start_predictions: torch.Tensor, start_state: StateType, step: StepFunctionType
+        self,
+        start_predictions: torch.Tensor,
+        start_state: StateType,
+        step: StepFunctionType,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = start_predictions.size()[0]
 
@@ -377,8 +391,8 @@ class DiverseBeamSearch:
         num_classes = start_class_log_probabilities.size()[1]
 
         # shape: (batch_size, beam_size), (batch_size, beam_size)
-        start_top_log_probabilities, start_predicted_classes = start_class_log_probabilities.topk(
-            self.beam_size
+        start_top_log_probabilities, start_predicted_classes = (
+            start_class_log_probabilities.topk(self.beam_size)
         )
         if self.beam_size == 1 and (start_predicted_classes == self.end_index).all():
             warnings.warn(
@@ -460,12 +474,18 @@ class DiverseBeamSearch:
             )
 
             # shape: (batch_size * beam_size, per_node_beam_size)
-            summed_top_log_probabilities = top_log_probabilities + expanded_last_log_probabilities
+            summed_top_log_probabilities = (
+                top_log_probabilities + expanded_last_log_probabilities
+            )
 
             # Rewrite scores for diverse decoding.
             # shape: (batch_size * beam_size, per_node_beam_size)
-            ranking = torch.arange(self.per_node_beam_size).to(summed_top_log_probabilities)
-            rewritten_summed_top_log_probabilities = summed_top_log_probabilities - self.gamma * ranking[None, :]
+            ranking = torch.arange(self.per_node_beam_size).to(
+                summed_top_log_probabilities
+            )
+            rewritten_summed_top_log_probabilities = (
+                summed_top_log_probabilities - self.gamma * ranking[None, :]
+            )
 
             # shape: (batch_size, beam_size * per_node_beam_size)
             reshaped_summed = summed_top_log_probabilities.reshape(
@@ -484,9 +504,7 @@ class DiverseBeamSearch:
 
             # Keep only the top `beam_size` beam indices.
             # shape: (batch_size, beam_size), (batch_size, beam_size)
-            _, restricted_beam_indices = reshaped_rewritten_summed.topk(
-                self.beam_size
-            )
+            _, restricted_beam_indices = reshaped_rewritten_summed.topk(self.beam_size)
 
             restricted_beam_log_probs = reshaped_summed.gather(
                 1, restricted_beam_indices
@@ -539,7 +557,9 @@ class DiverseBeamSearch:
                 RuntimeWarning,
             )
 
-        reconstructed_predictions = self.reconstruct_sequences(predictions, backpointers)
+        reconstructed_predictions = self.reconstruct_sequences(
+            predictions, backpointers
+        )
 
         # shape: (batch_size, beam_size, max_steps)
         all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
@@ -562,7 +582,10 @@ class RandomSample:
 
     @torch.no_grad()
     def search(
-        self, start_predictions: torch.Tensor, start_state: StateType, step: StepFunctionType
+        self,
+        start_predictions: torch.Tensor,
+        start_state: StateType,
+        step: StepFunctionType,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = start_predictions.size()[0]
 
@@ -582,12 +605,24 @@ class RandomSample:
         num_classes = start_class_log_probabilities.size()[1]
 
         # shape: (batch_size, sample_size)
-        truncated_start_class_log_probabilities, truncated_classes = torch.topk(start_class_log_probabilities, self.k)
-        truncated_start_predicted_classes = torch.multinomial(torch.exp(truncated_start_class_log_probabilities), self.sample_size, replacement=True)
-        start_predicted_classes = torch.gather(truncated_classes, dim=1, index=truncated_start_predicted_classes)
+        truncated_start_class_log_probabilities, truncated_classes = torch.topk(
+            start_class_log_probabilities, self.k
+        )
+        truncated_start_predicted_classes = torch.multinomial(
+            torch.exp(truncated_start_class_log_probabilities),
+            self.sample_size,
+            replacement=True,
+        )
+        start_predicted_classes = torch.gather(
+            truncated_classes, dim=1, index=truncated_start_predicted_classes
+        )
 
         # shape: (batch_size, sample_size)
-        start_top_log_probabilities = torch.gather(truncated_start_class_log_probabilities, dim=1, index=truncated_start_predicted_classes)
+        start_top_log_probabilities = torch.gather(
+            truncated_start_class_log_probabilities,
+            dim=1,
+            index=truncated_start_predicted_classes,
+        )
 
         if self.sample_size == 1 and (start_predicted_classes == self.end_index).all():
             warnings.warn(
@@ -655,18 +690,30 @@ class RandomSample:
 
             # shape (both): (batch_size * sample_size, 1)
             # shape: (batch_size, sample_size)
-            truncated_cleaned_log_probabilities, truncated_classes = torch.topk(cleaned_log_probabilities, self.k)
-            truncated_predicted_classes = torch.multinomial(torch.exp(truncated_cleaned_log_probabilities), 1, replacement=True)
-            predicted_classes = torch.gather(truncated_classes, dim=1, index=truncated_predicted_classes)
+            truncated_cleaned_log_probabilities, truncated_classes = torch.topk(
+                cleaned_log_probabilities, self.k
+            )
+            truncated_predicted_classes = torch.multinomial(
+                torch.exp(truncated_cleaned_log_probabilities), 1, replacement=True
+            )
+            predicted_classes = torch.gather(
+                truncated_classes, dim=1, index=truncated_predicted_classes
+            )
 
             # shape: (batch_size, sample_size)
-            top_log_probabilities = torch.gather(truncated_cleaned_log_probabilities, dim=1, index=truncated_predicted_classes)
+            top_log_probabilities = torch.gather(
+                truncated_cleaned_log_probabilities,
+                dim=1,
+                index=truncated_predicted_classes,
+            )
 
             predicted_classes = predicted_classes.reshape(batch_size, self.sample_size)
-            top_log_probabilities = top_log_probabilities.reshape(batch_size, self.sample_size)
+            top_log_probabilities = top_log_probabilities.reshape(
+                batch_size, self.sample_size
+            )
 
             predictions.append(predicted_classes)
-            
+
             last_log_probabilities = top_log_probabilities + last_log_probabilities
 
         if not torch.isfinite(last_log_probabilities).all():

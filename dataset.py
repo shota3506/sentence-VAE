@@ -1,7 +1,6 @@
-import os
-import json
 import torch
 from torch.utils.data import Dataset
+
 
 class SentenceDataset(Dataset):
     def __init__(
@@ -23,7 +22,7 @@ class SentenceDataset(Dataset):
         self.bos_index = bos_index
         self.eos_index = eos_index
 
-        with open(data_file, 'r') as f:
+        with open(data_file, "r") as f:
             self._data = [line.strip() for line in f]
 
     def __len__(self) -> int:
@@ -31,7 +30,11 @@ class SentenceDataset(Dataset):
 
     def __getitem__(self, idx):
         d = self._data[idx]
-        d = [self.bos_index] + self.tokenizer(d)[:self.max_length - 2] + [self.eos_index]
+        d = (
+            [self.bos_index]
+            + self.tokenizer(d)[: self.max_length - 2]
+            + [self.eos_index]
+        )
         return d
 
     @staticmethod

@@ -8,20 +8,38 @@
 #   with-sources: false
 
 -e file:.
+black==24.3.0
+click==8.1.7
+    # via black
 filelock==3.13.1
     # via torch
+flake8==7.0.0
 fsspec==2024.3.1
     # via torch
 jinja2==3.1.3
     # via torch
 markupsafe==2.1.5
     # via jinja2
+mccabe==0.7.0
+    # via flake8
 mpmath==1.3.0
     # via sympy
+mypy-extensions==1.0.0
+    # via black
 networkx==3.2.1
     # via torch
 numpy==1.26.4
     # via sentence-vae
+packaging==24.0
+    # via black
+pathspec==0.12.1
+    # via black
+platformdirs==4.2.0
+    # via black
+pycodestyle==2.11.1
+    # via flake8
+pyflakes==3.2.0
+    # via flake8
 sympy==1.12
     # via torch
 torch==2.2.1
