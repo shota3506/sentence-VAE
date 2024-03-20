@@ -18,7 +18,8 @@ class LmCrossEntropyLoss(nn.Module):
     def compute_loss(self, input: Tensor, target: Tensor) -> Tensor:
         batch_size, _, num_embeddings = input.shape
         loss = self.criterion(
-            input.contiguous().view(-1, num_embeddings), target.contiguous().view(-1)
+            input.contiguous().view(-1, num_embeddings),
+            target.contiguous().view(-1),
         ).view(batch_size, -1)
         return loss
 

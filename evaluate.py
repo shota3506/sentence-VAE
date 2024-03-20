@@ -19,6 +19,8 @@ def main(args):
 
 
 def evaluate_bleu(hypotheses, references):
+    smoothing_function = nltk.translate.bleu_score.SmoothingFunction().method1
+
     print("BLEU")
     score = 0
     for ref, hyp in zip(references, hypotheses):
@@ -27,7 +29,7 @@ def evaluate_bleu(hypotheses, references):
         score += nltk.translate.bleu_score.sentence_bleu(
             [ref],
             hyp,
-            smoothing_function=nltk.translate.bleu_score.SmoothingFunction().method1,
+            smoothing_function=smoothing_function,
         )
 
     score /= len(hypotheses)
@@ -51,7 +53,9 @@ def evaluate_rouge(hypotheses, references, max_n=4):
         stemming=True,
     )
 
-    rg = {"rouge-%d" % n: {"f": 0, "r": 0, "p": 0} for n in range(1, max_n + 1)}
+    rg = {
+        "rouge-%d" % n: {"f": 0, "r": 0, "p": 0} for n in range(1, max_n + 1)
+    }
     for hyp, ref in zip(hypotheses, references):
         score = evaluator.get_scores(hyp, ref)
         for n in range(1, max_n + 1):

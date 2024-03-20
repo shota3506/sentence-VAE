@@ -41,17 +41,23 @@ def main() -> None:
         word_dropout=0.0,
         dropped_index=tokenizer.unk_index,
     ).to(device)
-    model.load_state_dict(torch.load(args.checkpoint_file, map_location=device))
+    model.load_state_dict(
+        torch.load(args.checkpoint_file, map_location=device)
+    )
     model.eval()
 
     z = torch.randn(args.sample_size, args.dim_latent, device=device)
     hidden = model.fc_hidden(z)
     hidden = (
-        hidden.view(args.sample_size, -1, model.dim_hidden).transpose(0, 1).contiguous()
+        hidden.view(args.sample_size, -1, model.dim_hidden)
+        .transpose(0, 1)
+        .contiguous()
     )
 
     start_predictions = (
-        torch.zeros(args.sample_size, device=device).fill_(tokenizer.bos_index).long()
+        torch.zeros(args.sample_size, device=device)
+        .fill_(tokenizer.bos_index)
+        .long()
     )
     start_state = {"hidden": hidden.permute(1, 0, 2)}
     predictions, log_probabilities = searcher.search(

@@ -40,14 +40,24 @@ def main() -> None:
         word_dropout=0.0,
         dropped_index=tokenizer.unk_index,
     ).to(device)
-    model.load_state_dict(torch.load(args.checkpoint_file, map_location=device))
+    model.load_state_dict(
+        torch.load(args.checkpoint_file, map_location=device)
+    )
     model.eval()
 
     sentence1 = input("Please input sentence1: ")
     sentence2 = input("Please input sentence2: ")
 
-    s1 = [tokenizer.bos_index] + tokenizer.encode(sentence1) + [tokenizer.eos_index]
-    s2 = [tokenizer.bos_index] + tokenizer.encode(sentence2) + [tokenizer.eos_index]
+    s1 = (
+        [tokenizer.bos_index]
+        + tokenizer.encode(sentence1)
+        + [tokenizer.eos_index]
+    )
+    s2 = (
+        [tokenizer.bos_index]
+        + tokenizer.encode(sentence2)
+        + [tokenizer.eos_index]
+    )
 
     z1, _ = model.encode(
         torch.tensor([s1]).to(device), torch.tensor([len(s1)]).to(device)
@@ -61,7 +71,9 @@ def main() -> None:
     for r in range(1, 10):
         z = (1 - 0.1 * r) * z1 + 0.1 * r * z2
         hidden = model.fc_hidden(z)
-        hidden = hidden.view(1, -1, model.dim_hidden).transpose(0, 1).contiguous()
+        hidden = (
+            hidden.view(1, -1, model.dim_hidden).transpose(0, 1).contiguous()
+        )
 
         start_predictions = (
             torch.zeros(1, device=device).fill_(tokenizer.bos_index).long()

@@ -22,7 +22,9 @@ class VAE(nn.Module):
         self.bidirectional = bidirectional
 
         self.dropout = nn.Dropout(p=dropout)
-        self.word_dropout = WordDropout(p=word_dropout, dropped_index=dropped_index)
+        self.word_dropout = WordDropout(
+            p=word_dropout, dropped_index=dropped_index
+        )
 
         self.embedding = nn.Embedding(num_embeddings, dim_embedding)
         self.encoder = nn.GRU(
@@ -66,7 +68,9 @@ class VAE(nn.Module):
         z = self.reparameterize(mean, logvar)
 
         hidden = self.fc_hidden(z)
-        hidden = hidden.view(bsz, -1, self.dim_hidden).transpose(0, 1).contiguous()
+        hidden = (
+            hidden.view(bsz, -1, self.dim_hidden).transpose(0, 1).contiguous()
+        )
 
         output, _ = self.decode(tgt, hidden)
         return output, mean, logvar, z

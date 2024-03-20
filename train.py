@@ -62,7 +62,9 @@ def main():
     handler1 = logging.StreamHandler()
     handler1.setLevel(logging.INFO)
     handler2 = logging.FileHandler(filename=args.log_file, mode="w")
-    handler2.setFormatter(logging.Formatter("%(asctime)s %(levelname)8s %(message)s"))
+    handler2.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)8s %(message)s")
+    )
     handler2.setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler1)
@@ -169,7 +171,8 @@ def main():
             valid_kl_loss /= len(valid_loader)
 
         logger.info(
-            "[Epoch %d/%d] Training loss: %.2f, CE loss: %.2f, KL loss: %.2f, Validation loss: %.2f, CE loss: %.2f, KL loss: %.2f"
+            "[Epoch %d/%d] Training loss: %.2f, CE loss: %.2f, KL loss: %.2f, "
+            "Validation loss: %.2f, CE loss: %.2f, KL loss: %.2f"
             % (
                 epoch,
                 args.num_epochs,
