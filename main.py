@@ -6,6 +6,7 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
+from search import BeamSearch
 from dataset import SentenceDataset
 from tokenizer import Tokenizer
 from sentence_vae import VAE, LmCrossEntropyLoss
@@ -14,22 +15,28 @@ from sentence_vae import VAE, LmCrossEntropyLoss
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def add_model_arguments(parser) -> None:
+    parser.add_argument("--dim_embedding", type=int, default=256)
+    parser.add_argument("--dim_hidden", type=int, default=512)
+    parser.add_argument("--dim_latent", type=int, default=512)
+    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--bidirectional", action="store_true")
+
+
 def main():
     parser = argparse.ArgumentParser()
     subparser = parser.add_subparsers()
 
+    # train command
     parser_train = subparser.add_parser("train")
     parser_train.set_defaults(func=train)
+
+    add_model_arguments(parser_train)
 
     parser_train.add_argument("--train_file", type=str, required=True)
     parser_train.add_argument("--valid_file", type=str, required=True)
     parser_train.add_argument("--vocab_file", type=str, required=True)
-    # model
-    parser_train.add_argument("--dim_embedding", type=int, default=256)
-    parser_train.add_argument("--dim_hidden", type=int, default=512)
-    parser_train.add_argument("--dim_latent", type=int, default=512)
-    parser_train.add_argument("--num_layers", type=int, default=2)
-    parser_train.add_argument("--bidirectional", action="store_true")
+    # train
     parser_train.add_argument("--dropout", type=float, default=0.1)
     parser_train.add_argument("--word_dropout", type=float, default=0.25)
     # optim
@@ -44,8 +51,20 @@ def main():
     parser_train.add_argument("--k", type=float, default=0.0025)
     parser_train.add_argument("--x0", type=int, default=2500)
 
-    args = parser.parse_args()
+    # sample command
+    parser_sample = subparser.add_parser("sample")
+    parser_sample.set_defaults(func=sample)
 
+    add_model_arguments(parser_sample)
+
+    parser_sample.add_argument("--vocab_file", type=str, required=True)
+    parser_sample.add_argument(
+        "--checkpoint_file", type=str, default="model.pth"
+    )
+    parser_sample.add_argument("--sample_size", type=int, default=10)
+    parser_sample.add_argument("--search_width", type=int, default=1)
+
+    args = parser.parse_args()
     args.func(args)
 
 
@@ -67,6 +86,8 @@ class KLAnnealer:
 
 
 def train(args: argparse.Namespace):
+    print(args.dim_embedding)
+
     logger = logging.getLogger(__name__)
     handler1 = logging.StreamHandler()
     handler1.setLevel(logging.INFO)
@@ -195,6 +216,51 @@ def train(args: argparse.Namespace):
         )
 
         torch.save(model.state_dict(), args.checkpoint_file)
+
+
+def sample(args: argparse.Namespace):
+    tokenizer = Tokenizer(args.vocab_file)
+
+    searcher = BeamSearch(tokenizer.eos_index, beam_size=args.search_width)
+
+    model = VAE(
+        num_embeddings=len(tokenizer),
+        dim_embedding=args.dim_embedding,
+        dim_hidden=args.dim_hidden,
+        dim_latent=args.dim_latent,
+        num_layers=args.num_layers,
+        bidirectional=args.bidirectional,
+        dropout=0.0,
+        word_dropout=0.0,
+        dropped_index=tokenizer.unk_index,
+    ).to(device)
+    model.load_state_dict(
+        torch.load(args.checkpoint_file, map_location=device)
+    )
+    model.eval()
+
+    z = torch.randn(args.sample_size, args.dim_latent, device=device)
+    hidden = model.fc_hidden(z)
+    hidden = (
+        hidden.view(args.sample_size, -1, model.dim_hidden)
+        .transpose(0, 1)
+        .contiguous()
+    )
+
+    start_predictions = (
+        torch.zeros(args.sample_size, device=device)
+        .fill_(tokenizer.bos_index)
+        .long()
+    )
+    start_state = {"hidden": hidden.permute(1, 0, 2)}
+    predictions, log_probabilities = searcher.search(
+        start_predictions, start_state, model.step
+    )
+
+    for pred in predictions:
+        tokens = pred[0]
+        tokens = tokens[tokens != tokenizer.eos_index].tolist()
+        print(tokenizer.decode(tokens))
 
 
 if __name__ == "__main__":
