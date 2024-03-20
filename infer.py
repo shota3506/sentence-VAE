@@ -4,7 +4,7 @@ import torch
 
 from search import BeamSearch
 from tokenizer import Tokenizer
-from model import VAE
+from sentence_vae import VAE
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
