@@ -10,33 +10,43 @@ from dataset import SentenceDataset
 from tokenizer import Tokenizer
 from sentence_vae import VAE, LmCrossEntropyLoss
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-parser = argparse.ArgumentParser()
-# Data
-parser.add_argument("--train_file", type=str, required=True)
-parser.add_argument("--valid_file", type=str, required=True)
-parser.add_argument("--vocab_file", type=str, required=True)
-# Model
-parser.add_argument("--dim_embedding", type=int, default=256)
-parser.add_argument("--dim_hidden", type=int, default=512)
-parser.add_argument("--dim_latent", type=int, default=512)
-parser.add_argument("--num_layers", type=int, default=2)
-parser.add_argument("--bidirectional", action="store_true")
-parser.add_argument("--dropout", type=float, default=0.1)
-parser.add_argument("--word_dropout", type=float, default=0.25)
-# Optim
-parser.add_argument("--batch_size", type=int, default=128)
-parser.add_argument("--num_epochs", type=int, default=30)
-parser.add_argument("--learning_rate", type=float, default=0.001)
-parser.add_argument("--print_every", type=int, default=100)
-parser.add_argument("--checkpoint_file", type=str, default="model.pth")
-parser.add_argument("--log_file", type=str, default="train.log")
 
-parser.add_argument("--k", type=float, default=0.0025)
-parser.add_argument("--x0", type=int, default=2500)
+def main():
+    parser = argparse.ArgumentParser()
+    subparser = parser.add_subparsers()
 
-args = parser.parse_args()
+    parser_train = subparser.add_parser("train")
+    parser_train.set_defaults(func=train)
+
+    parser_train.add_argument("--train_file", type=str, required=True)
+    parser_train.add_argument("--valid_file", type=str, required=True)
+    parser_train.add_argument("--vocab_file", type=str, required=True)
+    # model
+    parser_train.add_argument("--dim_embedding", type=int, default=256)
+    parser_train.add_argument("--dim_hidden", type=int, default=512)
+    parser_train.add_argument("--dim_latent", type=int, default=512)
+    parser_train.add_argument("--num_layers", type=int, default=2)
+    parser_train.add_argument("--bidirectional", action="store_true")
+    parser_train.add_argument("--dropout", type=float, default=0.1)
+    parser_train.add_argument("--word_dropout", type=float, default=0.25)
+    # optim
+    parser_train.add_argument("--batch_size", type=int, default=128)
+    parser_train.add_argument("--num_epochs", type=int, default=30)
+    parser_train.add_argument("--learning_rate", type=float, default=0.001)
+    parser_train.add_argument("--print_every", type=int, default=100)
+    parser_train.add_argument(
+        "--checkpoint_file", type=str, default="model.pth"
+    )
+    parser_train.add_argument("--log_file", type=str, default="train.log")
+    parser_train.add_argument("--k", type=float, default=0.0025)
+    parser_train.add_argument("--x0", type=int, default=2500)
+
+    args = parser.parse_args()
+
+    args.func(args)
 
 
 class KLAnnealer:
@@ -56,7 +66,7 @@ class KLAnnealer:
         self._step += 1
 
 
-def main():
+def train(args: argparse.Namespace):
     logger = logging.getLogger(__name__)
     handler1 = logging.StreamHandler()
     handler1.setLevel(logging.INFO)

@@ -4,7 +4,7 @@ This is a PyTorch implementation of variational auto-encoder (VAE) for natural l
 ## Usage instructions
 ### Train model
 ```
-python train.py \
+python main.py train \
 --train_file <file_path> \
 --valid_file <file_path> \
 --vocab_file <file_path>
@@ -15,7 +15,7 @@ python train.py \
 
 ### Sample sentences from prior distribution
 ```
-python train.py \
+python sample.py \
 --vocab_file <file_path> \
 --checkpoint_file <file_path> \
 --sample_size 10
