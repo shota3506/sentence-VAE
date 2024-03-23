@@ -8,17 +8,13 @@ class SentenceDataset(Dataset):
         data_file,
         tokenizer,
         max_length=50,
-        pad_index=0,
         bos_index=1,
         eos_index=2,
-        unk_index=3,
     ) -> None:
         super().__init__()
         self.max_length = max_length
         self.tokenizer = tokenizer
 
-        self.pad_index = pad_index
-        self.unk_index = unk_index
         self.bos_index = bos_index
         self.eos_index = eos_index
 

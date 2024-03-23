@@ -7,27 +7,26 @@ This is a PyTorch implementation of variational auto-encoder (VAE) for natural l
 python main.py train \
 --train_file <file_path> \
 --valid_file <file_path> \
---vocab_file <file_path>
+--vocabulary_file <file_path>
 ```
 - ```train_file``` one-sentence-per-line raw corpus file for training.
 - ```valid_file``` one-sentence-per-line raw corpus file for validation.
-- ```vocab_file``` vocabulary file.
+- ```vocabulary_file``` vocabulary file.
 
 ### Sample sentences from prior distribution
 ```
 python sample.py \
---vocab_file <file_path> \
+--vocabulary_file <file_path>
 --checkpoint_file <file_path> \
 --sample_size 10
 ```
-- ```vocab_file``` vocabulary file.
+- ```vocabulary_file``` vocabulary file.
 - ```checkpoint_file``` PyTorch model parameter file.
 - ```sample_size``` number of samples to generate.
 
 ## Example
 ### Penn Tree Bank
 Download data from [here](https://drive.google.com/drive/folders/1HyeGxhgtWWtTaCYlLOAIlAIXsGXM7TKG?usp=sharing). 
-Download trained model parameters and vocabulary file from [here](https://drive.google.com/drive/folders/1NMoPoVttRXJ74zN9W2HMqtSfD_S6OoK8?usp=sharing).
 
 Sentence samples.
 ```
