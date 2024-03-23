@@ -83,7 +83,7 @@ class VAE(nn.Module):
     def encode(self, src, length):
         embedded = self.dropout(self.embedding(src))
         packed = nn.utils.rnn.pack_padded_sequence(
-            embedded, length, enforce_sorted=False, batch_first=True
+            embedded, length.cpu(), enforce_sorted=False, batch_first=True
         )
         _, hidden = self.encoder(packed)
 

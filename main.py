@@ -26,7 +26,7 @@ def add_model_arguments(parser) -> None:
     parser.add_argument("--dim_embedding", type=int, default=256)
     parser.add_argument("--dim_hidden", type=int, default=512)
     parser.add_argument("--dim_latent", type=int, default=512)
-    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--bidirectional", action="store_true")
 
 
@@ -40,6 +40,7 @@ def main():
 
     parser_vocab.add_argument("--input_file", type=str, required=True)
     parser_vocab.add_argument("--output_file", type=str, required=True)
+    parser_vocab.add_argument("--max_vocabulary_size", type=int, default=8192)
 
     # train command
     parser_train = subparser.add_parser("train")
@@ -55,7 +56,7 @@ def main():
     parser_train.add_argument("--word_dropout", type=float, default=0.25)
     # optim
     parser_train.add_argument("--batch_size", type=int, default=128)
-    parser_train.add_argument("--num_epochs", type=int, default=30)
+    parser_train.add_argument("--num_epochs", type=int, default=50)
     parser_train.add_argument("--learning_rate", type=float, default=0.001)
     parser_train.add_argument("--print_every", type=int, default=100)
     parser_train.add_argument(
@@ -118,7 +119,7 @@ def vocabulary(args) -> None:
     ordered_dict = OrderedDict(counter.most_common())
     vocab = build_vocabulary(
         ordered_dict,
-        max_length=1024,
+        max_length=args.max_vocabulary_size,
         specials=special_tokens,
     )
 
@@ -205,7 +206,7 @@ def train(args: argparse.Namespace):
             valid_kl_loss,
         ) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         pbar = tqdm(train_loader)
-        pbar.set_description("[Epoch %d/%d]" % (epoch, args.num_epochs))
+        pbar.set_description("[Epoch %d/%d]" % (epoch + 1, args.num_epochs))
 
         # Train
         model.train()
@@ -258,11 +259,9 @@ def train(args: argparse.Namespace):
             valid_kl_loss /= len(valid_loader)
 
         logger.info(
-            "[Epoch %d/%d] Training loss: %.2f, CE loss: %.2f, KL loss: %.2f, "
+            "\tTraining loss: %.2f, CE loss: %.2f, KL loss: %.2f, "
             "Validation loss: %.2f, CE loss: %.2f, KL loss: %.2f"
             % (
-                epoch,
-                args.num_epochs,
                 train_loss,
                 train_ce_loss,
                 train_kl_loss,
