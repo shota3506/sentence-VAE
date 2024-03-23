@@ -21,8 +21,6 @@ dev-dependencies = [
     "black>=24.3.0",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/sentence_vae"]
+[tool.rye.scripts]
+format = "black --line-length 79 ."
+lint = "flake8 --exclude .venv ."
